@@ -8,28 +8,30 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 )
 
+const (
+	defaultEnlightenBase = "https://enlighten.enphaseenergy.com"
+	defaultGatewayBase   = "https://envoy.local"
+)
+
 type Client struct {
-	address  string
-	username string
-	password string
-	serial   string
-	token    *jwt.Token
+	enlightenBase string
+	gatewayBase   string
+	username      string
+	password      string
+	serial        string
+	token         *jwt.Token
 
 	sessionId string
+	expiresAt *time.Time
 	*http.Client
 }
 
-type JWTToken struct {
-	GenerationTime int    `json:"generation_time"`
-	Token          string `json:"token"`
-	ExpiresAt      int    `json:"expires_at"`
-}
-
-func getSessionId(token, address string) (string, error) {
+func getSessionId(token, gatewayBase string) (string, *time.Time, error) {
 	jar, _ := cookiejar.New(nil)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -38,28 +40,32 @@ func getSessionId(token, address string) (string, error) {
 		Jar:       jar,
 		Transport: tr,
 	}
-	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("https://%s/auth/check_jwt", address), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/auth/check_jwt", gatewayBase), nil)
+	if err != nil {
+		return "", nil, err
+	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	requestResponse, requestError := client.Do(req)
 	if requestError != nil {
-		return "", requestError
+		return "", nil, requestError
 	}
 	defer func() {
 		_ = requestResponse.Body.Close()
 	}()
-	_, err := io.ReadAll(requestResponse.Body)
+	_, err = io.ReadAll(requestResponse.Body)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	for _, cookie := range requestResponse.Cookies() {
 		if cookie.Name == "sessionId" {
-			return cookie.Value, nil // Success!
+			expiresAt := time.Now().Add(10 * time.Minute)
+			return cookie.Value, &expiresAt, nil // Success!
 		}
 	}
-	return "", fmt.Errorf("sessionId cookie not found")
+	return "", nil, fmt.Errorf("sessionId cookie not found")
 }
 
-func getLongLivedJWT(username, password, serial string) (*jwt.Token, error) {
+func getLongLivedJWT(enlightenBase, username, password, serial string) (*jwt.Token, error) {
 	if username == "" || password == "" {
 		return nil, fmt.Errorf("missing username or password when getting JWT")
 	}
@@ -75,14 +81,14 @@ func getLongLivedJWT(username, password, serial string) (*jwt.Token, error) {
 	// First, login using your username and password
 	fieldsLogin := url.Values{"user[email]": {username}, "user[password]": {password}}
 
-	_, errLogin := client.PostForm("https://enlighten.enphaseenergy.com/login/login", fieldsLogin)
+	_, errLogin := client.PostForm(fmt.Sprintf("%s/login/login", enlightenBase), fieldsLogin)
 	// Response error checking omitted, but what we needed was the cookie, which is now in the jar
 
 	if errLogin != nil {
 		return nil, errLogin
 	}
 
-	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("https://enlighten.enphaseenergy.com/entrez-auth-token?serial_num=%s", serial), nil)
+	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/entrez-auth-token?serial_num=%s", enlightenBase, serial), nil)
 	requestResponse, requestError := client.Do(req)
 	if requestError != nil {
 		return nil, requestError
@@ -96,7 +102,7 @@ func getLongLivedJWT(username, password, serial string) (*jwt.Token, error) {
 		return nil, err
 	}
 
-	jwtToken := JWTToken{}
+	jwtToken := TokenResponse{}
 	unmarshalError := json.Unmarshal(body, &jwtToken)
 
 	if unmarshalError != nil {
@@ -111,22 +117,65 @@ func getLongLivedJWT(username, password, serial string) (*jwt.Token, error) {
 
 func NewClient(opts ...OptionFunc) (*Client, error) {
 	var err error
-	client := &Client{}
+	client := &Client{
+		enlightenBase: defaultEnlightenBase,
+		gatewayBase:   defaultGatewayBase,
+	}
 
 	for _, o := range opts {
 		if err := o(client); err != nil {
 			return nil, err
 		}
 	}
-	if client.address == "" {
-		return nil, fmt.Errorf("invalid or missing envoy address")
+	if client.gatewayBase == "" {
+		return nil, fmt.Errorf("invalid or missing envoy gatewayBase")
 	}
 	if client.token == nil {
 		return nil, fmt.Errorf("invalid or missing credentials")
 	}
-	client.sessionId, err = getSessionId(client.token.Raw, client.address)
+	client.sessionId, client.expiresAt, err = getSessionId(client.token.Raw, client.gatewayBase)
 	if err != nil {
 		return nil, err
 	}
 	return client, nil
+}
+
+func (c *Client) Production() (*ProductionResponse, error) {
+	var err error
+	var resp ProductionResponse
+	if c.expiresAt == nil || c.expiresAt.After(time.Now()) {
+		c.sessionId, c.expiresAt, err = getSessionId(c.token.Raw, c.gatewayBase)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	jar, _ := cookiejar.New(nil)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Jar:       jar,
+		Transport: tr,
+	}
+	cookie := &http.Cookie{
+		Name:  "sessionId",
+		Value: c.sessionId,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/production.json?details=1", c.gatewayBase), nil)
+	req.AddCookie(cookie)
+	requestResponse, requestError := client.Do(req)
+	if requestError != nil {
+		return nil, requestError
+	}
+	defer func() {
+		_ = requestResponse.Body.Close()
+	}()
+
+	err = json.NewDecoder(requestResponse.Body).Decode(&resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
