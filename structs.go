@@ -34,7 +34,7 @@ type Measurement struct {
 	VahLifetime      int     `json:"vahLifetime,omitempty"`
 	RmsCurrent       float64 `json:"rmsCurrent,omitempty"`
 	RmsVoltage       float64 `json:"rmsVoltage,omitempty"`
-	ReactPwr         int     `json:"reactPwr,omitempty"`
+	ReactPwr         float64 `json:"reactPwr,omitempty"`
 	ApprntPwr        float64 `json:"apprntPwr,omitempty"`
 	PwrFactor        float64 `json:"pwrFactor,omitempty"`
 	WhToday          int     `json:"whToday,omitempty"`
@@ -53,7 +53,7 @@ type Line struct {
 	VahLifetime      int     `json:"vahLifetime"`
 	RmsCurrent       float64 `json:"rmsCurrent"`
 	RmsVoltage       float64 `json:"rmsVoltage"`
-	ReactPwr         int     `json:"reactPwr"`
+	ReactPwr         float64 `json:"reactPwr"`
 	ApprntPwr        float64 `json:"apprntPwr"`
 	PwrFactor        float64 `json:"pwrFactor"`
 	WhToday          int     `json:"whToday"`

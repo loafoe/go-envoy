@@ -155,9 +155,254 @@ func TestProduction(t *testing.T) {
 	}
 	defer teardown()
 
+	productionResponse := `{
+  "production": [
+    {
+      "type": "inverters",
+      "activeCount": 17,
+      "readingTime": 1672293751,
+      "wNow": 0,
+      "whLifetime": 61639
+    },
+    {
+      "type": "eim",
+      "activeCount": 0,
+      "measurementType": "production",
+      "readingTime": 1672293852,
+      "wNow": -0.699,
+      "whLifetime": 0,
+      "varhLeadLifetime": 0,
+      "varhLagLifetime": 0,
+      "vahLifetime": 0,
+      "rmsCurrent": 0.202,
+      "rmsVoltage": 723.626,
+      "reactPwr": 0.714,
+      "apprntPwr": 48.254,
+      "pwrFactor": 0,
+      "whToday": 0,
+      "whLastSevenDays": 0,
+      "vahToday": 0,
+      "varhLeadToday": 0,
+      "varhLagToday": 0,
+      "lines": [
+        {
+          "wNow": 0,
+          "whLifetime": 0,
+          "varhLeadLifetime": 0,
+          "varhLagLifetime": 0,
+          "vahLifetime": 0,
+          "rmsCurrent": 0,
+          "rmsVoltage": 242.912,
+          "reactPwr": 0,
+          "apprntPwr": -0,
+          "pwrFactor": 0,
+          "whToday": 0,
+          "whLastSevenDays": 0,
+          "vahToday": 0,
+          "varhLeadToday": 0,
+          "varhLagToday": 0
+        },
+        {
+          "wNow": -0.699,
+          "whLifetime": 0,
+          "varhLeadLifetime": 0,
+          "varhLagLifetime": 0,
+          "vahLifetime": 0,
+          "rmsCurrent": 0.202,
+          "rmsVoltage": 239.602,
+          "reactPwr": 0.714,
+          "apprntPwr": 48.254,
+          "pwrFactor": 0,
+          "whToday": 0,
+          "whLastSevenDays": 0,
+          "vahToday": 0,
+          "varhLeadToday": 0,
+          "varhLagToday": 0
+        },
+        {
+          "wNow": -0,
+          "whLifetime": 0,
+          "varhLeadLifetime": 0,
+          "varhLagLifetime": 0,
+          "vahLifetime": 0,
+          "rmsCurrent": 0,
+          "rmsVoltage": 241.113,
+          "reactPwr": -0,
+          "apprntPwr": -0,
+          "pwrFactor": -1,
+          "whToday": 0,
+          "whLastSevenDays": 0,
+          "vahToday": 0,
+          "varhLeadToday": 0,
+          "varhLagToday": 0
+        }
+      ]
+    }
+  ],
+  "consumption": [
+    {
+      "type": "eim",
+      "activeCount": 0,
+      "measurementType": "total-consumption",
+      "readingTime": 1672293852,
+      "wNow": -6.063,
+      "whLifetime": 0,
+      "varhLeadLifetime": 0,
+      "varhLagLifetime": 0,
+      "vahLifetime": 0,
+      "rmsCurrent": -0.206,
+      "rmsVoltage": 723.628,
+      "reactPwr": -1.751,
+      "apprntPwr": -149.166,
+      "pwrFactor": -1,
+      "whToday": 0,
+      "whLastSevenDays": 0,
+      "vahToday": 0,
+      "varhLeadToday": 0,
+      "varhLagToday": 0,
+      "lines": [
+        {
+          "wNow": -3.146,
+          "whLifetime": 0,
+          "varhLeadLifetime": 0,
+          "varhLagLifetime": 0,
+          "vahLifetime": 0,
+          "rmsCurrent": -0.207,
+          "rmsVoltage": 242.859,
+          "reactPwr": -0,
+          "apprntPwr": -50.383,
+          "pwrFactor": -1,
+          "whToday": 0,
+          "whLastSevenDays": 0,
+          "vahToday": 0,
+          "varhLeadToday": 0,
+          "varhLagToday": 0
+        },
+        {
+          "wNow": -0.699,
+          "whLifetime": 0,
+          "varhLeadLifetime": 0,
+          "varhLagLifetime": 0,
+          "vahLifetime": 0,
+          "rmsCurrent": 0.202,
+          "rmsVoltage": 239.608,
+          "reactPwr": -0.714,
+          "apprntPwr": 48.45,
+          "pwrFactor": -0.01,
+          "whToday": 0,
+          "whLastSevenDays": 0,
+          "vahToday": 0,
+          "varhLeadToday": 0,
+          "varhLagToday": 0
+        },
+        {
+          "wNow": -2.218,
+          "whLifetime": 0,
+          "varhLeadLifetime": 0,
+          "varhLagLifetime": 0,
+          "vahLifetime": 0,
+          "rmsCurrent": -0.201,
+          "rmsVoltage": 241.162,
+          "reactPwr": -1.037,
+          "apprntPwr": -48.445,
+          "pwrFactor": -1,
+          "whToday": 0,
+          "whLastSevenDays": 0,
+          "vahToday": 0,
+          "varhLeadToday": 0,
+          "varhLagToday": 0
+        }
+      ]
+    },
+    {
+      "type": "eim",
+      "activeCount": 0,
+      "measurementType": "net-consumption",
+      "readingTime": 1672293852,
+      "wNow": -5.364,
+      "whLifetime": 0,
+      "varhLeadLifetime": 0,
+      "varhLagLifetime": 0,
+      "vahLifetime": 0,
+      "rmsCurrent": 0.408,
+      "rmsVoltage": 723.63,
+      "reactPwr": -1.037,
+      "apprntPwr": 98.964,
+      "pwrFactor": -0.17,
+      "whToday": 0,
+      "whLastSevenDays": 0,
+      "vahToday": 0,
+      "varhLeadToday": 0,
+      "varhLagToday": 0,
+      "lines": [
+        {
+          "wNow": -3.146,
+          "whLifetime": 0,
+          "varhLeadLifetime": 0,
+          "varhLagLifetime": 0,
+          "vahLifetime": 0,
+          "rmsCurrent": 0.207,
+          "rmsVoltage": 242.805,
+          "reactPwr": -0,
+          "apprntPwr": 50.37,
+          "pwrFactor": -0.33,
+          "whToday": 0,
+          "whLastSevenDays": 0,
+          "vahToday": 0,
+          "varhLeadToday": 0,
+          "varhLagToday": 0
+        },
+        {
+          "wNow": -0,
+          "whLifetime": 0,
+          "varhLeadLifetime": 0,
+          "varhLagLifetime": 0,
+          "vahLifetime": 0,
+          "rmsCurrent": 0,
+          "rmsVoltage": 239.613,
+          "reactPwr": -0,
+          "apprntPwr": 0,
+          "pwrFactor": 0,
+          "whToday": 0,
+          "whLastSevenDays": 0,
+          "vahToday": 0,
+          "varhLeadToday": 0,
+          "varhLagToday": 0
+        },
+        {
+          "wNow": -2.218,
+          "whLifetime": 0,
+          "varhLeadLifetime": 0,
+          "varhLagLifetime": 0,
+          "vahLifetime": 0,
+          "rmsCurrent": 0.201,
+          "rmsVoltage": 241.212,
+          "reactPwr": -1.037,
+          "apprntPwr": 48.594,
+          "pwrFactor": 0,
+          "whToday": 0,
+          "whLastSevenDays": 0,
+          "vahToday": 0,
+          "varhLeadToday": 0,
+          "varhLagToday": 0
+        }
+      ]
+    }
+  ],
+  "storage": [
+    {
+      "type": "acb",
+      "activeCount": 0,
+      "readingTime": 0,
+      "wNow": 0,
+      "whNow": 0,
+      "state": "idle"
+    }
+  ]
+}`
 	muxGateway.HandleFunc("/production.json", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(productionResponse))
 	})
 
 	resp, err := client.Production()
