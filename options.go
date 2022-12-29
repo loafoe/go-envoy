@@ -15,3 +15,10 @@ func WithEnlightenBase(enlightenBase string) OptionFunc {
 		return nil
 	}
 }
+
+func WithDebug(debug bool) OptionFunc {
+	return func(client *Client) error {
+		client.debug = debug
+		return nil
+	}
+}

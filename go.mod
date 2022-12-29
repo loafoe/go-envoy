@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/stretchr/testify v1.8.1
+	golang.org/x/exp v0.0.0-20221227203929-1b447090c38c
 )
 
 require (
