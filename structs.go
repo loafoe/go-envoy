@@ -14,12 +14,12 @@ type ProductionResponse struct {
 }
 
 type Storage struct {
-	Type        string `json:"type"`
-	ActiveCount int    `json:"activeCount"`
-	ReadingTime int    `json:"readingTime"`
-	WNow        int    `json:"wNow"`
-	WhNow       int    `json:"whNow"`
-	State       string `json:"state"`
+	Type        string  `json:"type"`
+	ActiveCount int     `json:"activeCount"`
+	ReadingTime int     `json:"readingTime"`
+	WNow        float64 `json:"wNow"`
+	WhNow       float64 `json:"whNow"`
+	State       string  `json:"state"`
 }
 
 type Measurement struct {
@@ -27,40 +27,40 @@ type Measurement struct {
 	ActiveCount      int     `json:"activeCount"`
 	ReadingTime      int     `json:"readingTime"`
 	WNow             float64 `json:"wNow"`
-	WhLifetime       int     `json:"whLifetime"`
+	WhLifetime       float64 `json:"whLifetime"`
 	MeasurementType  string  `json:"measurementType,omitempty"`
-	VarhLeadLifetime int     `json:"varhLeadLifetime,omitempty"`
-	VarhLagLifetime  int     `json:"varhLagLifetime,omitempty"`
-	VahLifetime      int     `json:"vahLifetime,omitempty"`
+	VarhLeadLifetime float64 `json:"varhLeadLifetime,omitempty"`
+	VarhLagLifetime  float64 `json:"varhLagLifetime,omitempty"`
+	VahLifetime      float64 `json:"vahLifetime,omitempty"`
 	RmsCurrent       float64 `json:"rmsCurrent,omitempty"`
 	RmsVoltage       float64 `json:"rmsVoltage,omitempty"`
 	ReactPwr         float64 `json:"reactPwr,omitempty"`
 	ApprntPwr        float64 `json:"apprntPwr,omitempty"`
 	PwrFactor        float64 `json:"pwrFactor,omitempty"`
-	WhToday          int     `json:"whToday,omitempty"`
-	WhLastSevenDays  int     `json:"whLastSevenDays,omitempty"`
-	VahToday         int     `json:"vahToday,omitempty"`
-	VarhLeadToday    int     `json:"varhLeadToday,omitempty"`
-	VarhLagToday     int     `json:"varhLagToday,omitempty"`
+	WhToday          float64 `json:"whToday,omitempty"`
+	WhLastSevenDays  float64 `json:"whLastSevenDays,omitempty"`
+	VahToday         float64 `json:"vahToday,omitempty"`
+	VarhLeadToday    float64 `json:"varhLeadToday,omitempty"`
+	VarhLagToday     float64 `json:"varhLagToday,omitempty"`
 	Lines            []Line  `json:"lines,omitempty"`
 }
 
 type Line struct {
 	WNow             float64 `json:"wNow"`
-	WhLifetime       int     `json:"whLifetime"`
-	VarhLeadLifetime int     `json:"varhLeadLifetime"`
-	VarhLagLifetime  int     `json:"varhLagLifetime"`
-	VahLifetime      int     `json:"vahLifetime"`
+	WhLifetime       float64 `json:"whLifetime"`
+	VarhLeadLifetime float64 `json:"varhLeadLifetime"`
+	VarhLagLifetime  float64 `json:"varhLagLifetime"`
+	VahLifetime      float64 `json:"vahLifetime"`
 	RmsCurrent       float64 `json:"rmsCurrent"`
 	RmsVoltage       float64 `json:"rmsVoltage"`
 	ReactPwr         float64 `json:"reactPwr"`
 	ApprntPwr        float64 `json:"apprntPwr"`
 	PwrFactor        float64 `json:"pwrFactor"`
-	WhToday          int     `json:"whToday"`
-	WhLastSevenDays  int     `json:"whLastSevenDays"`
-	VahToday         int     `json:"vahToday"`
-	VarhLeadToday    int     `json:"varhLeadToday"`
-	VarhLagToday     int     `json:"varhLagToday"`
+	WhToday          float64 `json:"whToday"`
+	WhLastSevenDays  float64 `json:"whLastSevenDays"`
+	VahToday         float64 `json:"vahToday"`
+	VarhLeadToday    float64 `json:"varhLeadToday"`
+	VarhLagToday     float64 `json:"varhLagToday"`
 }
 
 type TokenResponse struct {
