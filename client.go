@@ -206,6 +206,7 @@ func (c *Client) Production() (*ProductionResponse, error) {
 
 	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/production.json?details=1", c.gatewayBase), nil)
 	req.AddCookie(cookie)
+	req.Header.Set("Content-Type", "application/json")
 	requestResponse, requestError := client.Do(req)
 	if requestError != nil {
 		return nil, requestError
