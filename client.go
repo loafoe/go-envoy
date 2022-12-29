@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -19,6 +20,8 @@ const (
 )
 
 type Client struct {
+	sync.Mutex
+
 	enlightenBase string
 	gatewayBase   string
 	username      string
@@ -115,11 +118,14 @@ func getLongLivedJWT(enlightenBase, username, password, serial string) (*jwt.Tok
 	return token, nil
 }
 
-func NewClient(opts ...OptionFunc) (*Client, error) {
+func NewClient(username, password, serial string, opts ...OptionFunc) (*Client, error) {
 	var err error
 	client := &Client{
 		enlightenBase: defaultEnlightenBase,
 		gatewayBase:   defaultGatewayBase,
+		username:      username,
+		password:      password,
+		serial:        serial,
 	}
 
 	for _, o := range opts {
@@ -130,14 +136,39 @@ func NewClient(opts ...OptionFunc) (*Client, error) {
 	if client.gatewayBase == "" {
 		return nil, fmt.Errorf("invalid or missing envoy gatewayBase")
 	}
-	if client.token == nil {
-		return nil, fmt.Errorf("invalid or missing credentials")
+	if client.enlightenBase == "" {
+		return nil, fmt.Errorf("invalid or missing enlightenBase")
 	}
-	client.sessionId, client.expiresAt, err = getSessionId(client.token.Raw, client.gatewayBase)
+	_, err = client.longLivedJWT()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting JWT: %w", err)
+	}
+	_, err = client.shortLivedSessionId()
+	if err != nil {
+		return nil, fmt.Errorf("error getting sessionId: %w", err)
 	}
 	return client, nil
+}
+
+func (c *Client) longLivedJWT() (string, error) {
+	var err error
+
+	c.Lock()
+	defer c.Unlock()
+
+	if c.token != nil && c.expiresAt != nil && c.expiresAt.Before(time.Now()) {
+		return c.token.Raw, nil
+	}
+	if c.serial == "" {
+		return "", fmt.Errorf("missing gateway serial")
+	}
+
+	token, err := getLongLivedJWT(c.enlightenBase, c.username, c.password, c.serial)
+	if err != nil {
+		return "", fmt.Errorf("getting long lived token with credentials: %w", err)
+	}
+	c.token = token
+	return c.token.Raw, nil
 }
 
 func (c *Client) Production() (*ProductionResponse, error) {
@@ -178,4 +209,25 @@ func (c *Client) Production() (*ProductionResponse, error) {
 		return nil, err
 	}
 	return &resp, nil
+}
+
+func (c *Client) shortLivedSessionId() (string, error) {
+	if c.expiresAt != nil && c.expiresAt.Before(time.Now()) {
+		return c.sessionId, nil
+	}
+
+	rawToken, err := c.longLivedJWT()
+	if err != nil {
+		return "", err
+	}
+	c.Lock()
+	defer c.Unlock()
+
+	sessionId, expiresAt, err := getSessionId(rawToken, c.gatewayBase)
+	if err != nil {
+		return "", err
+	}
+	c.sessionId = sessionId
+	c.expiresAt = expiresAt
+	return sessionId, nil
 }

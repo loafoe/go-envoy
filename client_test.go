@@ -130,11 +130,9 @@ func setup(t *testing.T) (func(), error) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	client, err = envoy.NewClient(
+	client, err = envoy.NewClient("foo", "bar", "12222999",
 		envoy.WithEnlightenBase(enlightenServer.URL),
-		envoy.WithGatewayAddress(gatewayServer.URL),
-		envoy.WithSerial("12222999"),
-		envoy.WithCredentials("foo", "bar"))
+		envoy.WithGatewayAddress(gatewayServer.URL))
 	if !assert.Nil(t, err) {
 		return func() {
 			enlightenServer.Close()
