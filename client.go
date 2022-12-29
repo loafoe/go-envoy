@@ -183,13 +183,12 @@ func (c *Client) longLivedJWT() (string, error) {
 }
 
 func (c *Client) Production() (*ProductionResponse, error) {
-	var err error
 	var resp ProductionResponse
-	if c.expiresAt == nil || c.expiresAt.After(time.Now()) {
-		c.sessionId, c.expiresAt, err = getSessionId(c.token.Raw, c.gatewayBase, c.debug)
-		if err != nil {
-			return nil, err
-		}
+
+	sessionId, err := c.shortLivedSessionId()
+
+	if err != nil {
+		return nil, err
 	}
 
 	jar, _ := cookiejar.New(nil)
@@ -202,7 +201,7 @@ func (c *Client) Production() (*ProductionResponse, error) {
 	}
 	cookie := &http.Cookie{
 		Name:  "sessionId",
-		Value: c.sessionId,
+		Value: sessionId,
 	}
 
 	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/production.json?details=1", c.gatewayBase), nil)
