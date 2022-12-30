@@ -145,10 +145,6 @@ func NewClient(username, password, serial string, opts ...OptionFunc) (*Client, 
 	if client.enlightenBase == "" {
 		return nil, fmt.Errorf("invalid or missing enlightenBase")
 	}
-	_, err = client.longLivedJWT()
-	if err != nil {
-		return nil, fmt.Errorf("error getting JWT: %w", err)
-	}
 	_, err = client.shortLivedSessionId()
 	if err != nil {
 		return nil, fmt.Errorf("error getting sessionId: %w", err)
