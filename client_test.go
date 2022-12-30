@@ -405,11 +405,14 @@ func TestProduction(t *testing.T) {
 		_, _ = w.Write([]byte(productionResponse))
 	})
 
-	resp, err := client.Production()
+	res, resp, err := client.Production()
 	if !assert.Nil(t, err) {
 		return
 	}
-	assert.NotNil(t, resp)
+	if !assert.NotNil(t, resp) {
+		return
+	}
+	assert.NotNil(t, res)
 }
 
 func TestInverters(t *testing.T) {
@@ -439,12 +442,41 @@ func TestInverters(t *testing.T) {
 		_, _ = w.Write([]byte(invertersResponse))
 	})
 
-	resp, err := client.Inverters()
+	res, resp, err := client.Inverters()
 	if !assert.Nil(t, err) {
 		return
 	}
 	if !assert.NotNil(t, resp) {
 		return
 	}
-	assert.Len(t, *resp, 2)
+	if !assert.NotNil(t, res) {
+		return
+	}
+	assert.Len(t, *res, 2)
+}
+
+func TestCommCheck(t *testing.T) {
+	teardown, err := setup(t)
+	if !assert.Nil(t, err) {
+		return
+	}
+	defer teardown()
+
+	commCheckResponse := `{"482240000001":5,"482240000002":5}`
+	muxGateway.HandleFunc("/installer/pcu_comm_check", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(commCheckResponse))
+	})
+
+	res, resp, err := client.CommCheck()
+	if !assert.Nil(t, err) {
+		return
+	}
+	if !assert.NotNil(t, resp) {
+		return
+	}
+	if !assert.NotNil(t, res) {
+		return
+	}
+	assert.Len(t, *res, 2)
 }

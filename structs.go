@@ -76,3 +76,4 @@ type Inverter struct {
 	LastReportWatts int    `json:"lastReportWatts"`
 	MaxReportWatts  int    `json:"maxReportWatts"`
 }
+type CommCheckResponse map[string]int

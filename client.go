@@ -224,13 +224,13 @@ func (c *Client) longLivedJWT() (string, error) {
 	return c.token.Raw, nil
 }
 
-func (c *Client) Inverters() (*[]Inverter, error) {
+func (c *Client) Inverters() (*[]Inverter, *http.Response, error) {
 	var inverters []Inverter
 
 	sessionId, err := c.shortLivedSessionId()
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	jar, _ := cookiejar.New(nil)
@@ -251,7 +251,7 @@ func (c *Client) Inverters() (*[]Inverter, error) {
 	req.Header.Set("Content-Type", "application/json")
 	requestResponse, requestError := client.Do(req)
 	if requestError != nil {
-		return nil, requestError
+		return nil, nil, requestError
 	}
 	defer func() {
 		_ = requestResponse.Body.Close()
@@ -259,18 +259,58 @@ func (c *Client) Inverters() (*[]Inverter, error) {
 
 	err = json.NewDecoder(requestResponse.Body).Decode(&inverters)
 	if err != nil {
-		return nil, err
+		return nil, requestResponse, err
 	}
-	return &inverters, nil
+	return &inverters, requestResponse, nil
 }
 
-func (c *Client) Production() (*ProductionResponse, error) {
+func (c *Client) CommCheck() (*CommCheckResponse, *http.Response, error) {
+	var commCheckResponse CommCheckResponse
+
+	sessionId, err := c.shortLivedSessionId()
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	jar, _ := cookiejar.New(nil)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Jar:       jar,
+		Transport: tr,
+	}
+	cookie := &http.Cookie{
+		Name:  "sessionId",
+		Value: sessionId,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/installer/pcu_comm_check", c.gatewayBase), nil)
+	req.AddCookie(cookie)
+	req.Header.Set("Content-Type", "application/json")
+	requestResponse, requestError := client.Do(req)
+	if requestError != nil {
+		return nil, nil, requestError
+	}
+	defer func() {
+		_ = requestResponse.Body.Close()
+	}()
+
+	err = json.NewDecoder(requestResponse.Body).Decode(&commCheckResponse)
+	if err != nil {
+		return nil, requestResponse, err
+	}
+	return &commCheckResponse, requestResponse, nil
+}
+
+func (c *Client) Production() (*ProductionResponse, *http.Response, error) {
 	var resp ProductionResponse
 
 	sessionId, err := c.shortLivedSessionId()
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	jar, _ := cookiejar.New(nil)
@@ -291,7 +331,7 @@ func (c *Client) Production() (*ProductionResponse, error) {
 	req.Header.Set("Content-Type", "application/json")
 	requestResponse, requestError := client.Do(req)
 	if requestError != nil {
-		return nil, requestError
+		return nil, nil, requestError
 	}
 	defer func() {
 		_ = requestResponse.Body.Close()
@@ -299,9 +339,9 @@ func (c *Client) Production() (*ProductionResponse, error) {
 
 	err = json.NewDecoder(requestResponse.Body).Decode(&resp)
 	if err != nil {
-		return nil, err
+		return nil, requestResponse, err
 	}
-	return &resp, nil
+	return &resp, requestResponse, nil
 }
 
 func (c *Client) shortLivedSessionId() (string, error) {
