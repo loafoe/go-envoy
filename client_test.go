@@ -133,7 +133,8 @@ func setup(t *testing.T) (func(), error) {
 	client, err = envoy.NewClient("foo", "bar", "12222999",
 		envoy.WithEnlightenBase(enlightenServer.URL),
 		envoy.WithGatewayAddress(gatewayServer.URL),
-		envoy.WithDebug(true))
+		envoy.WithDebug(true),
+		envoy.WithNotification(envoy.NilNotification))
 	if !assert.Nil(t, err) {
 		return func() {
 			enlightenServer.Close()

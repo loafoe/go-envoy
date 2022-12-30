@@ -22,3 +22,10 @@ func WithDebug(debug bool) OptionFunc {
 		return nil
 	}
 }
+
+func WithNotification(notification Notification) OptionFunc {
+	return func(client *Client) error {
+		client.notification = notification
+		return nil
+	}
+}

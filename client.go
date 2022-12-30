@@ -3,6 +3,7 @@ package envoy
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,8 +11,6 @@ import (
 	"net/url"
 	"sync"
 	"time"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/golang-jwt/jwt/v4"
 )
@@ -30,13 +29,16 @@ type Client struct {
 	password      string
 	serial        string
 	token         *jwt.Token
+	jwtExpires    time.Time
 
-	sessionId string
-	expiresAt *time.Time
-	debug     bool
+	sessionId        string
+	sessionCreatedAt time.Time
+	sessionLastUsed  time.Time
+	debug            bool
+	notification     Notification
 }
 
-func getSessionId(token, gatewayBase string, debug bool) (string, *time.Time, error) {
+func getSessionId(token, gatewayBase string) (string, error) {
 	jar, _ := cookiejar.New(nil)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -47,36 +49,29 @@ func getSessionId(token, gatewayBase string, debug bool) (string, *time.Time, er
 	}
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/auth/check_jwt", gatewayBase), nil)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	requestResponse, requestError := client.Do(req)
 	if requestError != nil {
-		return "", nil, requestError
+		return "", requestError
 	}
 	defer func() {
 		_ = requestResponse.Body.Close()
 	}()
 	_, err = io.ReadAll(requestResponse.Body)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 	for _, cookie := range requestResponse.Cookies() {
 		if cookie.Name == "sessionId" {
-			expiresAt := time.Now().Add(10 * time.Minute)
-			if debug {
-				slog.Debug("successfully retrieved sessionId", "sessionId", cookie.Value)
-			}
-			return cookie.Value, &expiresAt, nil // Success!
+			return cookie.Value, nil // Success!
 		}
 	}
-	if debug {
-		slog.Debug("failed to retrieve sessionId")
-	}
-	return "", nil, fmt.Errorf("sessionId cookie not found")
+	return "", fmt.Errorf("sessionId cookie not found")
 }
 
-func getLongLivedJWT(enlightenBase, username, password, serial string, debug bool) (*jwt.Token, error) {
+func getLongLivedJWT(enlightenBase, username, password, serial string) (*jwt.Token, error) {
 	if username == "" || password == "" {
 		return nil, fmt.Errorf("missing username or password when getting JWT")
 	}
@@ -121,10 +116,10 @@ func getLongLivedJWT(enlightenBase, username, password, serial string, debug boo
 	}
 
 	token, err := jwt.Parse(jwtToken.Token, func(token *jwt.Token) (interface{}, error) {
-		return []byte("AllYourBase"), nil
+		return []byte("bogus"), nil
 	})
-	if debug {
-		slog.Debug("successfully retrieved JWT", "jwt", token.Raw)
+	if errors.Is(err, jwt.ErrTokenExpired) {
+		return nil, err
 	}
 	return token, nil
 }
@@ -161,24 +156,75 @@ func NewClient(username, password, serial string, opts ...OptionFunc) (*Client, 
 	return client, nil
 }
 
+func (c *Client) InvalidateSession() {
+	c.Lock()
+	defer c.Unlock()
+
+	c.sessionId = ""
+}
+
+func (c *Client) jwtExpired() bool {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.token == nil {
+		return true
+	}
+	now := time.Now()
+
+	if c.jwtExpires.Before(now) {
+		return true
+	}
+	claims, ok := c.token.Claims.(jwt.MapClaims)
+	if !ok {
+		return true
+	}
+	expiresAt, ok := claims["exp"].(int64)
+	if !ok {
+		return true
+	}
+	c.jwtExpires = time.Unix(expiresAt, 0)
+
+	return c.jwtExpires.Before(now)
+}
+
+func (c *Client) sessionExpired() bool {
+	c.Lock()
+	defer c.Unlock()
+
+	now := time.Now()
+
+	if c.sessionId == "" || c.sessionLastUsed.After(now.Add(30*time.Minute)) {
+		return true
+	}
+	return false
+}
+
 func (c *Client) longLivedJWT() (string, error) {
 	var err error
+
+	if !c.jwtExpired() {
+		return c.token.Raw, nil
+	}
 
 	c.Lock()
 	defer c.Unlock()
 
-	if c.token != nil && c.expiresAt != nil && c.expiresAt.Before(time.Now()) {
-		return c.token.Raw, nil
-	}
 	if c.serial == "" {
 		return "", fmt.Errorf("missing gateway serial")
 	}
 
-	token, err := getLongLivedJWT(c.enlightenBase, c.username, c.password, c.serial, c.debug)
+	token, err := getLongLivedJWT(c.enlightenBase, c.username, c.password, c.serial)
 	if err != nil {
+		if c.notification != nil {
+			c.notification.JWTError(err)
+		}
 		return "", fmt.Errorf("getting long lived token with credentials: %w", err)
 	}
 	c.token = token
+	if c.notification != nil {
+		c.notification.JWTRefreshed(c.token.Raw)
+	}
 	return c.token.Raw, nil
 }
 
@@ -223,7 +269,11 @@ func (c *Client) Production() (*ProductionResponse, error) {
 }
 
 func (c *Client) shortLivedSessionId() (string, error) {
-	if c.expiresAt != nil && c.expiresAt.Before(time.Now()) {
+	if !c.sessionExpired() {
+		c.sessionLastUsed = time.Now()
+		if c.notification != nil {
+			c.notification.SessionUsed(c.sessionId)
+		}
 		return c.sessionId, nil
 	}
 
@@ -234,11 +284,19 @@ func (c *Client) shortLivedSessionId() (string, error) {
 	c.Lock()
 	defer c.Unlock()
 
-	sessionId, expiresAt, err := getSessionId(rawToken, c.gatewayBase, c.debug)
+	sessionId, err := getSessionId(rawToken, c.gatewayBase)
 	if err != nil {
+		if c.notification != nil {
+			c.notification.SessionError(err)
+		}
 		return "", err
 	}
+	now := time.Now()
 	c.sessionId = sessionId
-	c.expiresAt = expiresAt
+	c.sessionCreatedAt = now
+	c.sessionLastUsed = now
+	if c.notification != nil {
+		c.notification.SessionRefreshed(sessionId)
+	}
 	return sessionId, nil
 }
