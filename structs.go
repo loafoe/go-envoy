@@ -68,3 +68,11 @@ type TokenResponse struct {
 	Token          string `json:"token"`
 	ExpiresAt      int64  `json:"expires_at"`
 }
+
+type Inverter struct {
+	SerialNumber    string `json:"serialNumber"`
+	LastReportDate  int    `json:"lastReportDate"`
+	DevType         int    `json:"devType"`
+	LastReportWatts int    `json:"lastReportWatts"`
+	MaxReportWatts  int    `json:"maxReportWatts"`
+}

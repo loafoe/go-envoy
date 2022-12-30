@@ -224,6 +224,46 @@ func (c *Client) longLivedJWT() (string, error) {
 	return c.token.Raw, nil
 }
 
+func (c *Client) Inverters() (*[]Inverter, error) {
+	var inverters []Inverter
+
+	sessionId, err := c.shortLivedSessionId()
+
+	if err != nil {
+		return nil, err
+	}
+
+	jar, _ := cookiejar.New(nil)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Jar:       jar,
+		Transport: tr,
+	}
+	cookie := &http.Cookie{
+		Name:  "sessionId",
+		Value: sessionId,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/v1/production/inverters", c.gatewayBase), nil)
+	req.AddCookie(cookie)
+	req.Header.Set("Content-Type", "application/json")
+	requestResponse, requestError := client.Do(req)
+	if requestError != nil {
+		return nil, requestError
+	}
+	defer func() {
+		_ = requestResponse.Body.Close()
+	}()
+
+	err = json.NewDecoder(requestResponse.Body).Decode(&inverters)
+	if err != nil {
+		return nil, err
+	}
+	return &inverters, nil
+}
+
 func (c *Client) Production() (*ProductionResponse, error) {
 	var resp ProductionResponse
 

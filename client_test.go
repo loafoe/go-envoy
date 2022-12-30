@@ -411,3 +411,40 @@ func TestProduction(t *testing.T) {
 	}
 	assert.NotNil(t, resp)
 }
+
+func TestInverters(t *testing.T) {
+	teardown, err := setup(t)
+	if !assert.Nil(t, err) {
+		return
+	}
+	defer teardown()
+
+	invertersResponse := `[
+  {
+    "serialNumber": "482240000001",
+    "lastReportDate": 1672392956,
+    "devType": 1,
+    "lastReportWatts": 14,
+    "maxReportWatts": 63
+  },
+  {
+    "serialNumber": "482240000002",
+    "lastReportDate": 1672392957,
+    "devType": 1,
+    "lastReportWatts": 13,
+    "maxReportWatts": 60
+  }]`
+	muxGateway.HandleFunc("/api/v1/production/inverters", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(invertersResponse))
+	})
+
+	resp, err := client.Inverters()
+	if !assert.Nil(t, err) {
+		return
+	}
+	if !assert.NotNil(t, resp) {
+		return
+	}
+	assert.Len(t, *resp, 2)
+}
