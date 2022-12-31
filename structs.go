@@ -77,3 +77,10 @@ type Inverter struct {
 	MaxReportWatts  int    `json:"maxReportWatts"`
 }
 type CommCheckResponse map[string]int
+
+type DiscoverResponse struct {
+	IPV4         string
+	IPV6         string
+	Serial       string
+	ProtoVersion string
+}
