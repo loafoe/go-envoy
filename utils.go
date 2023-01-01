@@ -2,13 +2,12 @@ package envoy
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 )
 
-func getJWTExpired(rawToken string) (*time.Time, error) {
+func GetJWTExpired(rawToken string) (*time.Time, error) {
 	token, err := parseUnverified(rawToken)
 	if err != nil {
 		return nil, err
@@ -17,11 +16,11 @@ func getJWTExpired(rawToken string) (*time.Time, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid or missing claims")
 	}
-	unixTs, err := strconv.ParseInt(claims["exp"].(string), 10, 64)
-	if err != nil {
-		return nil, err
+	unixTs, ok := claims["exp"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("invalid or missing 'exp' claim: %+v", claims)
 	}
-	tm := time.Unix(unixTs, 0)
+	tm := time.Unix(int64(unixTs), 0)
 	return &tm, nil
 }
 

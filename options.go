@@ -9,7 +9,7 @@ func WithJWT(rawToken string) OptionFunc {
 			return err
 		}
 		client.token = token
-		jwtExpires, err := getJWTExpired(rawToken)
+		jwtExpires, err := GetJWTExpired(rawToken)
 		if err != nil {
 			return err
 		}

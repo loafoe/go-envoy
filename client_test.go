@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/loafoe/go-envoy"
@@ -33,6 +35,17 @@ type payload struct {
 	Iat         int64  `json:"iat"`
 	Jti         string `json:"jti"`
 	Username    string `json:"username"`
+}
+
+var hmacSampleSecret []byte
+
+func init() {
+	// Load sample key data
+	if keyData, e := os.ReadFile("test/hmacTestKey"); e == nil {
+		hmacSampleSecret = keyData
+	} else {
+		panic(e)
+	}
 }
 
 func setup(t *testing.T) (func(), error) {
@@ -479,4 +492,32 @@ func TestCommCheck(t *testing.T) {
 		return
 	}
 	assert.Len(t, *res, 2)
+}
+
+func TestWithJWT(t *testing.T) {
+	c := &envoy.Client{}
+
+	afterTenMinutes := time.Now().Add(10 * time.Minute).Unix()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"foo": "bar",
+		"exp": afterTenMinutes,
+	})
+	tokenString, err := token.SignedString(hmacSampleSecret)
+	if !assert.Nil(t, err) {
+		return
+	}
+
+	err = envoy.WithJWT(tokenString)(c)
+
+	if !assert.Nil(t, err) {
+		return
+	}
+	expires, err := envoy.GetJWTExpired(tokenString)
+	if !assert.Nil(t, err) {
+		return
+	}
+	if !assert.NotNil(t, expires) {
+		return
+	}
+	assert.Equal(t, afterTenMinutes, expires.Unix())
 }
