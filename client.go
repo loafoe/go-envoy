@@ -167,19 +167,6 @@ func (c *Client) jwtExpired() bool {
 	}
 	now := time.Now()
 
-	if c.jwtExpires.Before(now) {
-		return true
-	}
-	claims, ok := c.token.Claims.(jwt.MapClaims)
-	if !ok {
-		return true
-	}
-	expiresAt, ok := claims["exp"].(int64)
-	if !ok {
-		return true
-	}
-	c.jwtExpires = time.Unix(expiresAt, 0)
-
 	return c.jwtExpires.Before(now)
 }
 
@@ -219,7 +206,12 @@ func (c *Client) longLivedJWT() (string, error) {
 		}
 		return "", fmt.Errorf("getting long lived token with credentials: %w", err)
 	}
+	expires, err := GetJWTExpired(token.Raw)
+	if err != nil {
+		return "", err
+	}
 	c.token = token
+	c.jwtExpires = *expires
 	if c.notification != nil {
 		c.notification.JWTRefreshed(c.token.Raw)
 	}
