@@ -35,6 +35,7 @@ type Client struct {
 	sessionCreatedAt time.Time
 	sessionLastUsed  time.Time
 	debug            bool
+	jwtAtInit        bool
 	notification     Notification
 }
 
@@ -115,9 +116,7 @@ func getLongLivedJWT(enlightenBase, username, password, serial string) (*jwt.Tok
 		return nil, unmarshalError
 	}
 
-	token, err := jwt.Parse(jwtToken.Token, func(token *jwt.Token) (interface{}, error) {
-		return []byte("bogus"), nil
-	})
+	token, _, err := new(jwt.Parser).ParseUnverified(jwtToken.Token, jwt.MapClaims{})
 	if errors.Is(err, jwt.ErrTokenExpired) {
 		return nil, err
 	}
@@ -201,6 +200,9 @@ func (c *Client) longLivedJWT() (string, error) {
 
 	if !c.jwtExpired() {
 		return c.token.Raw, nil
+	}
+	if c.jwtAtInit && c.username == "" || c.password == "" {
+		return "", fmt.Errorf("expired JWT and no username or password given")
 	}
 
 	c.Lock()
