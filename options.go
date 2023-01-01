@@ -2,6 +2,22 @@ package envoy
 
 type OptionFunc func(*Client) error
 
+func WithJWT(rawToken string) OptionFunc {
+	return func(client *Client) error {
+		token, err := parseUnverified(rawToken)
+		if err != nil {
+			return err
+		}
+		client.token = token
+		jwtExpires, err := getJWTExpired(rawToken)
+		if err != nil {
+			return err
+		}
+		client.jwtExpires = *jwtExpires
+		return nil
+	}
+}
+
 func WithGatewayAddress(address string) OptionFunc {
 	return func(client *Client) error {
 		client.gatewayBase = address
