@@ -218,6 +218,50 @@ func (c *Client) longLivedJWT() (string, error) {
 	return c.token.Raw, nil
 }
 
+func (c *Client) Batteries() (*[]Battery, *http.Response, error) {
+	sessionId, err := c.shortLivedSessionId()
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	jar, _ := cookiejar.New(nil)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Jar:       jar,
+		Transport: tr,
+	}
+	cookie := &http.Cookie{
+		Name:  "sessionId",
+		Value: sessionId,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/ivp/ensemble/inventory", c.gatewayBase), nil)
+	req.AddCookie(cookie)
+	req.Header.Set("Content-Type", "application/json")
+	requestResponse, requestError := client.Do(req)
+	if requestError != nil {
+		return nil, nil, requestError
+	}
+	defer func() {
+		_ = requestResponse.Body.Close()
+	}()
+
+	var invresp InventoryResponse
+	err = json.NewDecoder(requestResponse.Body).Decode(&invresp)
+	if err != nil {
+		return nil, requestResponse, err
+	}
+	for _, d := range invresp {
+		if d.Type == "ENCHARGE" {
+			return &d.Batteries, requestResponse, nil
+		}
+	}
+	return &[]Battery{}, requestResponse, nil
+}
+
 func (c *Client) Inverters() (*[]Inverter, *http.Response, error) {
 	var inverters []Inverter
 

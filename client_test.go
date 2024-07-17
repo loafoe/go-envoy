@@ -468,6 +468,158 @@ func TestInverters(t *testing.T) {
 	assert.Len(t, *res, 2)
 }
 
+func TestBatteries(t *testing.T) {
+	teardown, err := setup(t)
+	if !assert.Nil(t, err) {
+		return
+	}
+	defer teardown()
+
+	invertersResponse := `[
+    {
+        "type": "ENCHARGE",
+        "devices": [
+            {
+                "part_num": "830-00750-r31",
+                "serial_num": "1222345678",
+                "installed": 1718870245,
+                "device_status": [
+                    "envoy.global.ok",
+                    "prop.done"
+                ],
+                "last_rpt_date": 1721246902,
+                "admin_state": 6,
+                "admin_state_str": "ENCHG_STATE_READY",
+                "created_date": 1719970245,
+                "img_load_date": 1719970245,
+                "img_pnum_running": "2.0.6727_rel/22.15",
+                "bmu_fw_version": "2.1.34",
+                "communicating": true,
+                "sleep_enabled": false,
+                "percentFull": 61,
+                "temperature": 24,
+                "maxCellTemp": 25,
+                "reported_enc_grid_state": "grid-tied",
+                "comm_level_sub_ghz": 5,
+                "comm_level_2_4_ghz": 5,
+                "led_status": 12,
+                "dc_switch_off": false,
+                "encharge_rev": 2,
+                "encharge_capacity": 3360,
+                "phase": "ph-a",
+                "der_index": 2
+            },
+            {
+                "part_num": "830-00750-r31",
+                "serial_num": "1234567890",
+                "installed": 1720538607,
+                "device_status": [
+                    "envoy.global.ok",
+                    "prop.done"
+                ],
+                "last_rpt_date": 1721246976,
+                "admin_state": 6,
+                "admin_state_str": "ENCHG_STATE_READY",
+                "created_date": 1720538607,
+                "img_load_date": 1720538607,
+                "img_pnum_running": "2.0.6727_rel/22.15",
+                "bmu_fw_version": "2.1.34",
+                "communicating": true,
+                "sleep_enabled": false,
+                "percentFull": 61,
+                "temperature": 24,
+                "maxCellTemp": 24,
+                "reported_enc_grid_state": "grid-tied",
+                "comm_level_sub_ghz": 5,
+                "comm_level_2_4_ghz": 5,
+                "led_status": 12,
+                "dc_switch_off": false,
+                "encharge_rev": 2,
+                "encharge_capacity": 3360,
+                "phase": "ph-a",
+                "der_index": 2
+            },
+            {
+                "part_num": "836-00750-r29",
+                "serial_num": "49221234567",
+                "installed": 1720337267,
+                "device_status": [
+                    "envoy.global.ok",
+                    "prop.done"
+                ],
+                "last_rpt_date": 1721247048,
+                "admin_state": 6,
+                "admin_state_str": "ENCHG_STATE_READY",
+                "created_date": 1720337267,
+                "img_load_date": 1720337267,
+                "img_pnum_running": "2.0.6727_rel/22.15",
+                "bmu_fw_version": "2.1.34",
+                "communicating": true,
+                "sleep_enabled": false,
+                "percentFull": 61,
+                "temperature": 24,
+                "maxCellTemp": 24,
+                "reported_enc_grid_state": "grid-tied",
+                "comm_level_sub_ghz": 5,
+                "comm_level_2_4_ghz": 5,
+                "led_status": 12,
+                "dc_switch_off": false,
+                "encharge_rev": 2,
+                "encharge_capacity": 3360,
+                "phase": "ph-a",
+                "der_index": 2
+            }
+        ]
+    },
+    {
+        "type": "ENPOWER",
+        "devices": [
+            {
+                "part_num": "861-01381-r04",
+                "serial_num": "202334071482",
+                "installed": 1720570387,
+                "device_status": [
+                    "envoy.global.ok",
+                    "prop.done"
+                ],
+                "last_rpt_date": 1721247059,
+                "admin_state": 24,
+                "admin_state_str": "ENPWR_STATE_OPER_CLOSED",
+                "created_date": 1720570387,
+                "img_load_date": 1720570387,
+                "img_pnum_running": "2.0.5729_rel/22.15",
+                "communicating": true,
+                "temperature": 79,
+                "comm_level_sub_ghz": 5,
+                "comm_level_2_4_ghz": 5,
+                "mains_admin_state": "closed",
+                "mains_oper_state": "closed",
+                "Enpwr_grid_mode": "multimode-ongrid",
+                "Enchg_grid_mode": "multimode-ongrid",
+                "Enpwr_relay_state_bm": 15856,
+                "Enpwr_curr_state_id": 16
+            }
+        ]
+    }
+]`
+	muxGateway.HandleFunc("/ivp/ensemble/inventory", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(invertersResponse))
+	})
+
+	res, resp, err := client.Batteries()
+	if !assert.Nil(t, err) {
+		return
+	}
+	if !assert.NotNil(t, resp) {
+		return
+	}
+	if !assert.NotNil(t, res) {
+		return
+	}
+	assert.Len(t, *res, 3)
+}
+
 func TestCommCheck(t *testing.T) {
 	teardown, err := setup(t)
 	if !assert.Nil(t, err) {
