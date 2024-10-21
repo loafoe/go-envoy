@@ -84,3 +84,42 @@ type DiscoverResponse struct {
 	Serial       string
 	ProtoVersion string
 }
+
+type InventoryResponse []struct {
+	Batteries []Battery `json:"devices"`
+	Type      string    `json:"type"`
+}
+
+type Battery struct {
+	EnchgGridMode        string   `json:"Enchg_grid_mode,omitempty"`
+	EnpwrCurrStateID     int      `json:"Enpwr_curr_state_id,omitempty"`
+	EnpwrGridMode        string   `json:"Enpwr_grid_mode,omitempty"`
+	EnpwrRelayStateBm    int      `json:"Enpwr_relay_state_bm,omitempty"`
+	AdminState           int      `json:"admin_state"`
+	AdminStateStr        string   `json:"admin_state_str"`
+	BmuFwVersion         string   `json:"bmu_fw_version,omitempty"`
+	CommLevel24Ghz       int      `json:"comm_level_2_4_ghz"`
+	CommLevelSubGhz      int      `json:"comm_level_sub_ghz"`
+	Communicating        bool     `json:"communicating"`
+	CreatedDate          int      `json:"created_date"`
+	DcSwitchOff          bool     `json:"dc_switch_off"`
+	DerIndex             int      `json:"der_index,omitempty"`
+	DeviceStatus         []string `json:"device_status"`
+	EnchargeCapacity     int      `json:"encharge_capacity,omitempty"`
+	EnchargeRev          int      `json:"encharge_rev,omitempty"`
+	ImgLoadDate          int      `json:"img_load_date"`
+	ImgPnumRunning       string   `json:"img_pnum_running"`
+	Installed            int      `json:"installed"`
+	LastRptDate          int      `json:"last_rpt_date"`
+	LedStatus            int      `json:"led_status,omitempty"`
+	MainsAdminState      string   `json:"mains_admin_state,omitempty"`
+	MainsOperState       string   `json:"mains_oper_state,omitempty"`
+	MaxCellTemp          int      `json:"maxCellTemp,omitempty"`
+	PartNum              string   `json:"part_num"`
+	PercentFull          int      `json:"percentFull,omitempty"`
+	Phase                string   `json:"phase,omitempty"`
+	ReportedEncGridState string   `json:"reported_enc_grid_state,omitempty"`
+	SerialNum            string   `json:"serial_num"`
+	SleepEnabled         bool     `json:"sleep_enabled"`
+	Temperature          int      `json:"temperature"`
+}
