@@ -23,10 +23,10 @@ const (
 	defaultGatewayBase   = "https://envoy.local"
 
 	//Timeouts for client connections
-	defaultTimeout             = 30 * time.Second
+	defaultTimeout             = 10 * time.Second
 	defaultConnectTimeout      = 5 * time.Second // Timeout for establishing the connection
 	defaultTLSHandshakeTimeout = 5 * time.Second // Timeout for the TLS handshake
-	defaultKeepAlive           = 30 * time.Second
+	defaultKeepAlive           = 15 * time.Second
 )
 
 // HTTPClient is a wrapper around net/http.Client with improved defaults and error handling.
@@ -89,12 +89,10 @@ type Client struct {
 }
 
 func getSessionId(token, gatewayBase string) (string, error) {
-	jar, _ := cookiejar.New(nil)
 	client := NewHTTPClient(defaultTimeout)
-	client.client.Jar = jar
 
 	reqUri := fmt.Sprintf("%s/auth/check_jwt", gatewayBase)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUri, nil)
@@ -140,9 +138,7 @@ func getLongLivedJWT(enlightenBase, username, password, serial string) (*jwt.Tok
 		return nil, fmt.Errorf("missing serial number when getting JWT")
 	}
 
-	jar, _ := cookiejar.New(nil)
 	client := NewHTTPClient(defaultTimeout)
-	client.client.Jar = jar
 
 	// First, login using your username and password
 	fieldsLogin := url.Values{"user[email]": {username}, "user[password]": {password}}
@@ -292,7 +288,7 @@ func (c *Client) doRequest(uri string) (*[]byte, error) {
 
 	reqUri := fmt.Sprintf("%s%s", c.gatewayBase, uri)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUri, nil)
 
