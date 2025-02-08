@@ -31,7 +31,7 @@ const (
 
 // HTTPClient is a wrapper around net/http.Client with improved defaults and error handling.
 type HTTPClient struct {
-	client *http.Client
+	http.Client
 }
 
 // NewHTTPClient creates a new HTTPClient with sensible timeouts and keep-alive settings.
@@ -54,7 +54,7 @@ func NewHTTPClient(timeout time.Duration) *HTTPClient {
 
 	jar, _ := cookiejar.New(nil)
 	return &HTTPClient{
-		client: &http.Client{
+		http.Client{
 			Jar:       jar,
 			Timeout:   timeout,
 			Transport: transport,
@@ -64,7 +64,7 @@ func NewHTTPClient(timeout time.Duration) *HTTPClient {
 
 func (c *HTTPClient) ResetCookieJar() {
 	jar, _ := cookiejar.New(nil)
-	c.client.Jar = jar
+	c.Jar = jar
 }
 
 type Client struct {
@@ -100,7 +100,7 @@ func getSessionId(token, gatewayBase string) (string, error) {
 		return "", err
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	resp, err := client.client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -143,7 +143,7 @@ func getLongLivedJWT(enlightenBase, username, password, serial string) (*jwt.Tok
 	// First, login using your username and password
 	fieldsLogin := url.Values{"user[email]": {username}, "user[password]": {password}}
 
-	_, errLogin := client.client.PostForm(fmt.Sprintf("%s/login/login", enlightenBase), fieldsLogin)
+	_, errLogin := client.PostForm(fmt.Sprintf("%s/login/login", enlightenBase), fieldsLogin)
 	// Response error checking omitted, but what we needed was the cookie, which is now in the jar
 
 	if errLogin != nil {
@@ -151,7 +151,7 @@ func getLongLivedJWT(enlightenBase, username, password, serial string) (*jwt.Tok
 	}
 
 	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/entrez-auth-token?serial_num=%s", enlightenBase, serial), nil)
-	requestResponse, requestError := client.client.Do(req)
+	requestResponse, requestError := client.Do(req)
 	if requestError != nil {
 		return nil, requestError
 	}
@@ -299,7 +299,7 @@ func (c *Client) doRequest(uri string) (*[]byte, error) {
 	c.httpClient.ResetCookieJar()
 	req.AddCookie(cookie)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.httpClient.client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		if urlErr, ok := err.(*url.Error); ok && urlErr.Timeout() {
 			return nil, fmt.Errorf("request timed out: %w", err)
