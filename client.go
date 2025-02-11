@@ -1,27 +1,76 @@
 package envoy
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"sync"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	jwt "github.com/golang-jwt/jwt/v4"
 )
 
 const (
 	defaultEnlightenBase = "https://enlighten.enphaseenergy.com"
 	defaultGatewayBase   = "https://envoy.local"
+
+	//Timeouts for client connections
+	defaultTimeout             = 10 * time.Second
+	defaultConnectTimeout      = 5 * time.Second // Timeout for establishing the connection
+	defaultTLSHandshakeTimeout = 5 * time.Second // Timeout for the TLS handshake
+	defaultKeepAlive           = 15 * time.Second
 )
+
+// HTTPClient is a wrapper around net/http.Client with improved defaults and error handling.
+type HTTPClient struct {
+	http.Client
+}
+
+// NewHTTPClient creates a new HTTPClient with sensible timeouts and keep-alive settings.
+func NewHTTPClient(timeout time.Duration) *HTTPClient {
+	if timeout <= 0 {
+		timeout = defaultTimeout
+	}
+
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   defaultConnectTimeout,
+			KeepAlive: defaultKeepAlive,
+		}).DialContext,
+		TLSHandshakeTimeout:   defaultTLSHandshakeTimeout,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+		MaxIdleConns:          1, // Adjust as needed for connection pooling
+		IdleConnTimeout:       20 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	jar, _ := cookiejar.New(nil)
+	return &HTTPClient{
+		http.Client{
+			Jar:       jar,
+			Timeout:   timeout,
+			Transport: transport,
+		},
+	}
+}
+
+func (c *HTTPClient) ResetCookieJar() {
+	jar, _ := cookiejar.New(nil)
+	c.Jar = jar
+}
 
 type Client struct {
 	sync.Mutex
+
+	httpClient *HTTPClient
 
 	enlightenBase string
 	gatewayBase   string
@@ -40,31 +89,40 @@ type Client struct {
 }
 
 func getSessionId(token, gatewayBase string) (string, error) {
-	jar, _ := cookiejar.New(nil)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{
-		Jar:       jar,
-		Transport: tr,
-	}
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/auth/check_jwt", gatewayBase), nil)
+	client := NewHTTPClient(defaultTimeout)
+
+	reqUri := fmt.Sprintf("%s/auth/check_jwt", gatewayBase)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUri, nil)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	requestResponse, requestError := client.Do(req)
-	if requestError != nil {
-		return "", requestError
-	}
-	defer func() {
-		_ = requestResponse.Body.Close()
-	}()
-	_, err = io.ReadAll(requestResponse.Body)
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
-	for _, cookie := range requestResponse.Cookies() {
+
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Printf("Warning: failed to close response body: %v", closeErr)
+		}
+	}()
+
+	// Check the response status code.
+	if resp.StatusCode != http.StatusOK {
+		// Read the body for error details (but limit the amount read).
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024)) // Read up to 1KB of the error body.
+		return "", fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, body)
+	}
+
+	_, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+	for _, cookie := range resp.Cookies() {
 		if cookie.Name == "sessionId" {
 			return cookie.Value, nil // Success!
 		}
@@ -80,10 +138,7 @@ func getLongLivedJWT(enlightenBase, username, password, serial string) (*jwt.Tok
 		return nil, fmt.Errorf("missing serial number when getting JWT")
 	}
 
-	jar, _ := cookiejar.New(nil)
-	client := &http.Client{
-		Jar: jar,
-	}
+	client := NewHTTPClient(defaultTimeout)
 
 	// First, login using your username and password
 	fieldsLogin := url.Values{"user[email]": {username}, "user[password]": {password}}
@@ -131,6 +186,7 @@ func NewClient(username, password, serial string, opts ...OptionFunc) (*Client, 
 		username:      username,
 		password:      password,
 		serial:        serial,
+		httpClient:    NewHTTPClient(defaultTimeout),
 	}
 
 	for _, o := range opts {
@@ -218,168 +274,122 @@ func (c *Client) longLivedJWT() (string, error) {
 	return c.token.Raw, nil
 }
 
-func (c *Client) Batteries() (*[]Battery, *http.Response, error) {
+func (c *Client) doRequest(uri string) (*[]byte, error) {
 	sessionId, err := c.shortLivedSessionId()
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	jar, _ := cookiejar.New(nil)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{
-		Jar:       jar,
-		Transport: tr,
-	}
 	cookie := &http.Cookie{
 		Name:  "sessionId",
 		Value: sessionId,
 	}
 
-	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/ivp/ensemble/inventory", c.gatewayBase), nil)
+	reqUri := fmt.Sprintf("%s%s", c.gatewayBase, uri)
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUri, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	c.httpClient.ResetCookieJar()
 	req.AddCookie(cookie)
 	req.Header.Set("Content-Type", "application/json")
-	requestResponse, requestError := client.Do(req)
-	if requestError != nil {
-		return nil, nil, requestError
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		if urlErr, ok := err.(*url.Error); ok && urlErr.Timeout() {
+			return nil, fmt.Errorf("request timed out: %w", err)
+		}
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer func() {
-		_ = requestResponse.Body.Close()
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Printf("Warning: failed to close response body: %v", closeErr)
+		}
 	}()
 
-	var invresp InventoryResponse
-	err = json.NewDecoder(requestResponse.Body).Decode(&invresp)
+	// Check the response status code.
+	if resp.StatusCode != http.StatusOK {
+		// Read the body for error details (but limit the amount read).
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024)) // Read up to 1KB of the error body.
+		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, body)
+	}
+
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, requestResponse, err
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	return &body, err
+}
+
+func (c *Client) Batteries() (*[]Battery, error) {
+	requestResponse, err := c.doRequest("/ivp/ensemble/inventory")
+
+	if err != nil {
+		return nil, err
+	}
+
+	var invresp InventoryResponse
+	err = json.Unmarshal(*requestResponse, &invresp)
+	if err != nil {
+		return nil, err
 	}
 	for _, d := range invresp {
 		if d.Type == "ENCHARGE" {
-			return &d.Batteries, requestResponse, nil
+			return &d.Batteries, nil
 		}
 	}
-	return &[]Battery{}, requestResponse, nil
+	return &[]Battery{}, nil
 }
 
-func (c *Client) Inverters() (*[]Inverter, *http.Response, error) {
+func (c *Client) Inverters() (*[]Inverter, error) {
 	var inverters []Inverter
-
-	sessionId, err := c.shortLivedSessionId()
+	requestResponse, err := c.doRequest("/api/v1/production/inverters")
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	jar, _ := cookiejar.New(nil)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{
-		Jar:       jar,
-		Transport: tr,
-	}
-	cookie := &http.Cookie{
-		Name:  "sessionId",
-		Value: sessionId,
-	}
+	err = json.Unmarshal(*requestResponse, &inverters)
 
-	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/v1/production/inverters", c.gatewayBase), nil)
-	req.AddCookie(cookie)
-	req.Header.Set("Content-Type", "application/json")
-	requestResponse, requestError := client.Do(req)
-	if requestError != nil {
-		return nil, nil, requestError
-	}
-	defer func() {
-		_ = requestResponse.Body.Close()
-	}()
-
-	err = json.NewDecoder(requestResponse.Body).Decode(&inverters)
 	if err != nil {
-		return nil, requestResponse, err
+		return nil, err
 	}
-	return &inverters, requestResponse, nil
+	return &inverters, nil
 }
 
-func (c *Client) CommCheck() (*CommCheckResponse, *http.Response, error) {
+func (c *Client) CommCheck() (*CommCheckResponse, error) {
 	var commCheckResponse CommCheckResponse
-
-	sessionId, err := c.shortLivedSessionId()
+	requestResponse, err := c.doRequest("/installer/pcu_comm_check")
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	jar, _ := cookiejar.New(nil)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{
-		Jar:       jar,
-		Transport: tr,
-	}
-	cookie := &http.Cookie{
-		Name:  "sessionId",
-		Value: sessionId,
-	}
-
-	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/installer/pcu_comm_check", c.gatewayBase), nil)
-	req.AddCookie(cookie)
-	req.Header.Set("Content-Type", "application/json")
-	requestResponse, requestError := client.Do(req)
-	if requestError != nil {
-		return nil, nil, requestError
-	}
-	defer func() {
-		_ = requestResponse.Body.Close()
-	}()
-
-	err = json.NewDecoder(requestResponse.Body).Decode(&commCheckResponse)
+	err = json.Unmarshal(*requestResponse, &commCheckResponse)
 	if err != nil {
-		return nil, requestResponse, err
+		return nil, err
 	}
-	return &commCheckResponse, requestResponse, nil
+	return &commCheckResponse, nil
 }
 
-func (c *Client) Production() (*ProductionResponse, *http.Response, error) {
+func (c *Client) Production() (*ProductionResponse, error) {
 	var resp ProductionResponse
-
-	sessionId, err := c.shortLivedSessionId()
+	requestResponse, err := c.doRequest("/production.json?details=1")
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	jar, _ := cookiejar.New(nil)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{
-		Jar:       jar,
-		Transport: tr,
-	}
-	cookie := &http.Cookie{
-		Name:  "sessionId",
-		Value: sessionId,
-	}
-
-	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/production.json?details=1", c.gatewayBase), nil)
-	req.AddCookie(cookie)
-	req.Header.Set("Content-Type", "application/json")
-	requestResponse, requestError := client.Do(req)
-	if requestError != nil {
-		return nil, nil, requestError
-	}
-	defer func() {
-		_ = requestResponse.Body.Close()
-	}()
-
-	err = json.NewDecoder(requestResponse.Body).Decode(&resp)
+	err = json.Unmarshal(*requestResponse, &resp)
 	if err != nil {
-		return nil, requestResponse, err
+		return nil, err
 	}
-	return &resp, requestResponse, nil
+	return &resp, nil
 }
 
 func (c *Client) shortLivedSessionId() (string, error) {

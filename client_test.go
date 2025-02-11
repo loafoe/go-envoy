@@ -418,11 +418,11 @@ func TestProduction(t *testing.T) {
 		_, _ = w.Write([]byte(productionResponse))
 	})
 
-	res, resp, err := client.Production()
+	res, err := client.Production()
 	if !assert.Nil(t, err) {
 		return
 	}
-	if !assert.NotNil(t, resp) {
+	if !assert.NotNil(t, res) {
 		return
 	}
 	assert.NotNil(t, res)
@@ -455,11 +455,8 @@ func TestInverters(t *testing.T) {
 		_, _ = w.Write([]byte(invertersResponse))
 	})
 
-	res, resp, err := client.Inverters()
+	res, err := client.Inverters()
 	if !assert.Nil(t, err) {
-		return
-	}
-	if !assert.NotNil(t, resp) {
 		return
 	}
 	if !assert.NotNil(t, res) {
@@ -607,11 +604,8 @@ func TestBatteries(t *testing.T) {
 		_, _ = w.Write([]byte(invertersResponse))
 	})
 
-	res, resp, err := client.Batteries()
+	res, err := client.Batteries()
 	if !assert.Nil(t, err) {
-		return
-	}
-	if !assert.NotNil(t, resp) {
 		return
 	}
 	if !assert.NotNil(t, res) {
@@ -633,11 +627,8 @@ func TestCommCheck(t *testing.T) {
 		_, _ = w.Write([]byte(commCheckResponse))
 	})
 
-	res, resp, err := client.CommCheck()
+	res, err := client.CommCheck()
 	if !assert.Nil(t, err) {
-		return
-	}
-	if !assert.NotNil(t, resp) {
 		return
 	}
 	if !assert.NotNil(t, res) {
