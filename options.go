@@ -59,3 +59,23 @@ func WithNotification(notification Notification) OptionFunc {
 		return nil
 	}
 }
+
+func WithDiscovery() OptionFunc {
+	return func(client *Client) error {
+		resp, err := Discover()
+		if err != nil {
+			return fmt.Errorf("mDNS discovery failed: %w", err)
+		}
+		if resp.IPV4 != "" {
+			client.gatewayBase = fmt.Sprintf("https://%s", resp.IPV4)
+		} else if resp.IPV6 != "" {
+			client.gatewayBase = fmt.Sprintf("https://[%s]", resp.IPV6)
+		} else {
+			return fmt.Errorf("mDNS discovery returned no IP address")
+		}
+		if client.serial == "" && resp.Serial != "" {
+			client.serial = resp.Serial
+		}
+		return nil
+	}
+}
