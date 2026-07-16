@@ -24,10 +24,16 @@ func DiscoverWithTimeout(timeout time.Duration) (*DiscoverResponse, error) {
 		for entry := range entriesCh {
 			if strings.HasSuffix(entry.Name, "_enphase-envoy._tcp.local.") {
 				if entry.AddrV4 != nil {
-					response.IPV4 = entry.AddrV4.String()
+					ipStr := entry.AddrV4.String()
+					if ipStr != "<nil>" {
+						response.IPV4 = ipStr
+					}
 				}
 				if entry.AddrV6 != nil {
-					response.IPV6 = entry.AddrV6.String()
+					ipStr := entry.AddrV6.String()
+					if ipStr != "<nil>" {
+						response.IPV6 = ipStr
+					}
 				}
 				for _, f := range entry.InfoFields {
 					parts := strings.Split(f, "=")
@@ -58,6 +64,10 @@ func DiscoverWithTimeout(timeout time.Duration) (*DiscoverResponse, error) {
 
 	if !found {
 		return nil, fmt.Errorf("no envoy device found via mDNS within %v", timeout)
+	}
+
+	if response.IPV4 == "" && response.IPV6 == "" {
+		return nil, fmt.Errorf("envoy device found but no valid IP address resolved within %v", timeout)
 	}
 
 	return &response, nil
