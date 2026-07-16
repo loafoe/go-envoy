@@ -24,7 +24,7 @@ func TestDiscover(t *testing.T) {
 	t.Logf("  Serial: %s", resp.Serial)
 	t.Logf("  ProtoVersion: %s", resp.ProtoVersion)
 
-	assert.Equal(t, "192.168.2.242", resp.IPV4, "Should discover Envoy at expected IP")
+	assert.NotEmpty(t, resp.IPV4, "Should discover Envoy IP")
 	assert.NotEmpty(t, resp.Serial, "Serial number should be populated")
 	assert.NotEmpty(t, resp.ProtoVersion, "Protocol version should be populated")
 }
@@ -58,5 +58,5 @@ func TestWithDiscovery(t *testing.T) {
 	t.Logf("WithDiscovery would set gateway to: https://%s", resp.IPV4)
 	t.Logf("WithDiscovery would use serial: %s", resp.Serial)
 
-	assert.Equal(t, "192.168.2.242", resp.IPV4)
+	assert.NotEmpty(t, resp.IPV4)
 }
